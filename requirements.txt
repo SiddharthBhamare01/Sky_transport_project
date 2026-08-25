@@ -1,0 +1,7 @@
+fastapi>=0.115
+uvicorn[standard]>=0.34
+anthropic>=0.42
+python-multipart>=0.0.20
+python-dotenv>=1.0
+reportlab>=4.2
+pillow>=12.0
