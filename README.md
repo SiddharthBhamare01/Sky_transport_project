@@ -35,7 +35,8 @@ banner on the page tells you which mode you're in.
    predictable shape — no free-text parsing.
 3. Extracted fields appear in an editable form next to the document preview.
    If the model wasn't confident about something, a "review recommended"
-   banner explains why.
+   banner explains why, and the specific field(s) it flagged are highlighted
+   in the form (and later, in the table) — not just one document-level flag.
 4. Confirm (and correct, if needed) the fields, then "Add to table."
 5. Repeat for more documents; export the accumulated table as a CSV ready
    to paste into a spreadsheet.
@@ -62,6 +63,22 @@ set a `review_recommended` flag with an explanation when something is
 uncertain. Every field is editable before it's added to the table — a human
 confirms the data, the model doesn't get the last word.
 
+**Per-field confidence, and why it's framed around legibility, not
+confidence.** The first version only had one document-level
+`review_recommended` boolean. Real testing (see "The Result") showed that
+flag missing a genuine misread — the model was simply wrong, not uncertain,
+so asking it to self-report "confidence" was never going to catch that
+specific failure. The fix implemented instead: `low_confidence_fields`, a
+list of field names the model should populate whenever the *source text* for
+a field isn't crisply legible (handwriting, blur, glare, low resolution) —
+regardless of whether it still produced a plausible-looking value. That's a
+legibility test, not a confidence test, on the theory that "would a human
+need to double-check the source to be sure" is a more checkable question for
+the model than "how sure are you." The UI highlights those specific fields
+(in the form and, once added, in the table) instead of relying on one
+document-level banner. Whether this framing actually worked better is
+answered honestly (not favorably) in "The Result."
+
 **No database, no auth.** The backend is stateless per request; the browser
 holds the accumulated rows (in `localStorage`, so a refresh doesn't lose
 work) and builds the CSV client-side. This was a deliberate scope cut to fit
@@ -78,23 +95,25 @@ photo. This means the demo works even without network access or a live key.
 > **Provenance:** `app/sample_mode.py`'s canned results are genuine frozen
 > output from a real call to `app/extractor.py` against each fixture — not
 > hand-authored. Sample mode only skips the network call at request time;
-> the extraction logic is identical either way. One of these real runs
-> surfaced an actual extraction error worth calling out: on the
-> deliberately noisy/skewed "phone photo" fixture, the model misread
-> "Freightway Rd" as "Freighthay Rd" — and did *not* set
-> `review_recommended` to flag it. That's a genuine limitation, not a
-> hypothetical one; see "The Result" below.
+> the extraction logic is identical either way. These were re-run after the
+> `low_confidence_fields` feature was added (see below), and the second run
+> is what's frozen now — including its unresolved rough edges. See "The
+> Result" for what that surfaced.
 
 ## Known limitations / next steps
 
 - Single/small documents only — no multi-page batch handling.
 - No persistence beyond the browser session; a real version would want a
   small database so multiple dispatchers share one queue.
-- No confidence highlighting per-field in the UI (only a single
-  document-level flag) — and testing showed that flag isn't reliable on its
-  own (see "The Result" below, the misread street name that wasn't
-  flagged). Per-field confidence scoring, or a second verification pass,
-  would be a natural next step rather than trusting one boolean flag.
+- Per-field confidence flagging (`low_confidence_fields`) was added after the
+  original single-flag design missed a real misread (see "The Result"), but
+  testing after adding it showed it's not a full fix either: the specific
+  address misread still isn't flagged, and the model conflates "field
+  legitimately absent from this document type" with "field present but
+  illegible" (e.g. it flagged 6 fields on the POD as low-confidence that
+  simply don't exist on a POD by design). A second verification pass, or
+  separating "structurally not applicable" from "illegible" in the schema
+  itself, would be the next iteration rather than trusting this flag as-is.
 - PDF preview uses an `<iframe>`; browsers without a built-in PDF viewer
   fall back to an "Open PDF in new tab" link.
 - No auth — fine for a local demo, not for shared/production use.
@@ -132,17 +151,30 @@ demo. Three synthetic sample documents were generated so the tool is fully
 demoable without needing real (and likely sensitive) shipment paperwork.
 
 **The Result.** All three sample documents were run through the real
-pipeline (`gpt-4o-mini`, live API key, not mocked). The clean printed PDF
-(`bol_acme_freight.pdf`) extracted perfectly — every field matched the
-source exactly. The Proof of Delivery also extracted cleanly, correctly
-leaving fields not present on a POD (carrier, PRO #, pickup date) as
-`null` rather than guessing. The deliberately noisy/skewed "phone photo"
-fixture is where it broke: the model misread "Freightway Rd" as
-"Freighthay Rd" — a real, observed error — and did **not** set
-`review_recommended` to flag it, meaning a dispatcher relying on that flag
-would have missed a bad row. [Add your own take: does this change how much
-you'd trust the review-flag mechanism as designed, and what would you check
-or change given more time?]
+pipeline (`gpt-4o-mini`, live API key, not mocked) twice — once with the
+original single-flag design, once after adding `low_confidence_fields`.
+
+*Run 1 (single `review_recommended` flag):* the clean printed PDF
+(`bol_acme_freight.pdf`) extracted perfectly. The POD also extracted
+cleanly, correctly leaving fields not present on a POD as `null`. The
+noisy/skewed "phone photo" fixture is where it broke: the model misread
+"Freightway Rd" as "Freighthay Rd" and did **not** set `review_recommended`
+to flag it — a dispatcher trusting that flag would have missed a bad row.
+
+*Run 2 (after adding `low_confidence_fields`, meant to fix exactly that):*
+the clean PDF still extracted perfectly with nothing flagged. But the fix
+didn't fully work — on a re-run of the noisy photo, the model produced yet
+another misread of the same street name ("Freighthway Rd" this time, a
+third variant across runs, confirming the model is non-deterministic here)
+and again did **not** flag `shipper_address` as low-confidence. Separately,
+on the POD it *over*-flagged: 6 fields it correctly left `null` (because
+they're not on a POD at all) were also listed in `low_confidence_fields`,
+conflating "structurally absent" with "illegible." So the feature changed
+the failure mode without eliminating it — it's honestly a partial result,
+not a fixed one. [Add your own take: given this, would you trust this app's
+review flag today, and what's the one change you'd make first — a second
+verification pass on flagged fields, splitting "not applicable" from
+"illegible" in the schema, or something else?]
 
 **The Learning.** [Fill in: what you learned about prompting for structured
 extraction, the OCR-vs-LLM tradeoff, and what you'd do differently — plus a

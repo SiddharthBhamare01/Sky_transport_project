@@ -15,10 +15,14 @@ Extract only what is visibly printed or handwritten on the document. Never infer
 or guess a value that is not legible or not present - set it to null instead. \
 Never invent a value to fill a field.
 
-Set review_recommended to true whenever handwriting is ambiguous, a field is only \
-partially visible, the image quality makes a value uncertain, or you are otherwise \
-not confident in what you read. When review_recommended is true, briefly explain \
-why in extraction_notes.
+List a field's name in low_confidence_fields whenever the source text for that \
+field is not crisply and unambiguously legible on the page - due to handwriting, \
+blur, glare, low resolution, or partial visibility - even if you were able to \
+produce a plausible-looking value for it. Legibility, not your confidence in the \
+value you produced, is the test: if a human would need to double-check the source \
+document to be sure, flag it. Set review_recommended to true whenever \
+low_confidence_fields is non-empty, or for any other reason you are not confident \
+in the extraction as a whole; briefly explain why in extraction_notes.
 
 Dates should be normalized to YYYY-MM-DD when the source format allows it \
 unambiguously; otherwise leave the value as printed or set it to null."""
@@ -34,6 +38,8 @@ class ExtractionError(Exception):
 def _pdf_first_page_to_png(file_bytes: bytes) -> bytes:
     doc = pymupdf.open(stream=file_bytes, filetype="pdf")
     try:
+        if doc.page_count < 1:
+            raise ValueError("PDF has no pages")
         page = doc[0]
         pix = page.get_pixmap(dpi=200)
         return pix.tobytes("png")
@@ -46,7 +52,10 @@ def extract_from_bytes(file_bytes: bytes, mime_type: str) -> dict:
         raise ExtractionError("no_api_key", "No OPENAI_API_KEY is configured on the server.")
 
     if mime_type == "application/pdf":
-        image_bytes = _pdf_first_page_to_png(file_bytes)
+        try:
+            image_bytes = _pdf_first_page_to_png(file_bytes)
+        except Exception as e:
+            raise ExtractionError("invalid_pdf", "Could not read the uploaded PDF (it may be corrupt or empty).") from e
         image_mime = "image/png"
     else:
         image_bytes = file_bytes
@@ -87,10 +96,21 @@ def extract_from_bytes(file_bytes: bytes, mime_type: str) -> dict:
     except openai.APIStatusError as e:
         raise ExtractionError("api_error", f"Extraction service returned an error ({e.status_code}).") from e
 
-    text = response.choices[0].message.content
+    choice = response.choices[0]
+    if choice.finish_reason == "length":
+        raise ExtractionError("truncated", "The extraction response was cut off before completing. Try again.")
+
+    text = choice.message.content
+    if text is None:
+        refusal = getattr(choice.message, "refusal", None)
+        raise ExtractionError(
+            "refused",
+            refusal or "The extraction service declined to process this document.",
+        )
+
     try:
         fields = json.loads(text)
-    except json.JSONDecodeError as e:
+    except (TypeError, ValueError) as e:
         raise ExtractionError("parse_error", "Could not parse the extraction result.") from e
 
     return fields

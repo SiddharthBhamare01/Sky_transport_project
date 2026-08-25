@@ -22,6 +22,33 @@ BOL_SCHEMA = {
         "signature_present": {"type": ["boolean", "null"]},
         "review_recommended": {"type": "boolean"},
         "extraction_notes": {"type": ["string", "null"]},
+        "low_confidence_fields": {
+            "type": "array",
+            "description": (
+                "Names of fields whose source text was not crisply legible on "
+                "the page, even if a plausible value was still produced."
+            ),
+            "items": {
+                "type": "string",
+                "enum": [
+                    "shipper_name",
+                    "shipper_address",
+                    "consignee_name",
+                    "consignee_address",
+                    "carrier_name",
+                    "load_number",
+                    "pro_number",
+                    "pickup_date",
+                    "delivery_date",
+                    "weight",
+                    "weight_unit",
+                    "piece_count",
+                    "commodity_description",
+                    "freight_charge_terms",
+                    "signature_present",
+                ],
+            },
+        },
     },
     # OpenAI structured-output "strict" mode requires every property to be
     # listed as required (the field can still be null - nullability is
@@ -45,6 +72,7 @@ BOL_SCHEMA = {
         "signature_present",
         "review_recommended",
         "extraction_notes",
+        "low_confidence_fields",
     ],
     "additionalProperties": False,
 }

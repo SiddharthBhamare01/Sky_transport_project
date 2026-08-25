@@ -59,6 +59,9 @@ async def extract(file: UploadFile | None = File(None), sample_id: str | None = 
     if mime_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {mime_type}")
 
+    if file.size is not None and file.size > config.MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (10MB limit)")
+
     file_bytes = await file.read()
     if len(file_bytes) > config.MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=400, detail="File too large (10MB limit)")

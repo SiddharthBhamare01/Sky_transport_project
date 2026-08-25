@@ -5,10 +5,23 @@
 # only skips the network call at request time; the extraction logic itself
 # is identical to what runs on a real upload.
 #
-# Note the bol_northstar_photo result: the model misread "Freightway Rd" as
-# "Freighthay Rd" on the deliberately noisy/skewed photo fixture, and did
-# NOT set review_recommended to flag it - a genuine, observed failure mode
-# worth citing directly in the PIIRL "Result" section (see README.md).
+# PROVENANCE NOTE (re-run after adding low_confidence_fields to the schema):
+# this re-run surfaced two honest, unresolved findings, kept exactly as
+# observed rather than cleaned up - see README.md "The Result" for the full
+# writeup:
+#   1. The BOL address misread from the original run ("Freightway Rd" read
+#      wrong) still isn't caught by low_confidence_fields on this re-run -
+#      it produced a different misread ("Freighthway Rd", note this is a
+#      third variant vs. the original run's "Freighthay Rd" - the model is
+#      non-deterministic across calls) and again didn't flag the address
+#      field. The legibility-based prompt reframing did not fix the
+#      motivating failure case.
+#   2. On the POD fixture, the model flagged 6 fields as low-confidence
+#      (carrier_name, pickup_date, pro_number, piece_count,
+#      commodity_description, freight_charge_terms) that are legitimately
+#      absent from a POD document by design, not illegible - i.e. it
+#      conflated "structurally not present on this document type" with
+#      "present but hard to read", which was not the intended semantics.
 
 SAMPLES = {
     "bol_acme_freight": {
@@ -33,6 +46,7 @@ SAMPLES = {
             "signature_present": False,
             "review_recommended": False,
             "extraction_notes": None,
+            "low_confidence_fields": [],
         },
     },
     "bol_northstar_photo": {
@@ -41,7 +55,7 @@ SAMPLES = {
         "fields": {
             "document_type": "BOL",
             "shipper_name": "Northstar Logistics",
-            "shipper_address": "455 Freighthay Rd\nStockton, CA 95206",
+            "shipper_address": "455 Freighthway Rd\nStockton, CA 95206",
             "consignee_name": "Cascade Wholesale Foods",
             "consignee_address": "22 Market St\nSacramento, CA 95814",
             "carrier_name": "Northstar Logistics",
@@ -55,8 +69,13 @@ SAMPLES = {
             "commodity_description": "Refrigerated produce",
             "freight_charge_terms": "prepaid",
             "signature_present": False,
-            "review_recommended": False,
-            "extraction_notes": None,
+            "review_recommended": True,
+            "extraction_notes": (
+                "Field 'delivery_date' is missing. Handwriting is clear but the "
+                "date field is blank. Signature field is empty, indicating no "
+                "signature is present."
+            ),
+            "low_confidence_fields": ["delivery_date", "signature_present"],
         },
     },
     "pod_acme_delivery": {
@@ -81,6 +100,14 @@ SAMPLES = {
             "signature_present": True,
             "review_recommended": False,
             "extraction_notes": None,
+            "low_confidence_fields": [
+                "carrier_name",
+                "pickup_date",
+                "pro_number",
+                "piece_count",
+                "commodity_description",
+                "freight_charge_terms",
+            ],
         },
     },
 }

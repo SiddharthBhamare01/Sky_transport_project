@@ -107,9 +107,14 @@ async function runExtraction(doFetch, previewUrl, isPdf) {
   $("uploadBtn").disabled = true;
   try {
     const resp = await doFetch();
-    const data = await resp.json();
-    if (data.error) {
-      showError(`${data.error}: ${data.message}`);
+    let data = null;
+    try {
+      data = await resp.json();
+    } catch {
+      // non-JSON body (e.g. a raw 500) - fall through to the generic error below
+    }
+    if (!resp.ok || !data || data.error || !data.fields) {
+      showError((data && (data.message || data.detail)) || `Request failed (HTTP ${resp.status}).`);
       return;
     }
     currentFields = data.fields;
@@ -154,6 +159,7 @@ function renderPreview() {
 function renderForm() {
   const form = $("fieldForm");
   form.innerHTML = "";
+  const lowConfidence = new Set(currentFields.low_confidence_fields || []);
   const flag = $("reviewFlag");
   if (currentFields.review_recommended) {
     flag.classList.remove("hidden");
@@ -164,9 +170,9 @@ function renderForm() {
 
   FORM_FIELDS.forEach((f) => {
     const row = document.createElement("div");
-    row.className = "field-row";
+    row.className = "field-row" + (lowConfidence.has(f.key) ? " low-confidence" : "");
     const label = document.createElement("label");
-    label.textContent = f.label;
+    label.textContent = f.label + (lowConfidence.has(f.key) ? " ⚠" : "");
     row.appendChild(label);
 
     let value = currentFields[f.key];
@@ -219,6 +225,7 @@ function addCurrentToTable() {
   const edited = readFormIntoFields();
   edited.review_recommended = currentFields.review_recommended;
   edited.extraction_notes = currentFields.extraction_notes;
+  edited.low_confidence_fields = currentFields.low_confidence_fields || [];
   rows.push(edited);
   saveRows(rows);
   renderTable();
@@ -240,8 +247,10 @@ function renderTable() {
   body.innerHTML = "";
   rows.forEach((row, idx) => {
     const tr = document.createElement("tr");
+    const rowLowConfidence = new Set(row.low_confidence_fields || []);
     TABLE_FIELDS.forEach((key) => {
       const td = document.createElement("td");
+      if (rowLowConfidence.has(key)) td.classList.add("low-confidence");
       td.contentEditable = "true";
       td.textContent = row[key] === null || row[key] === undefined ? "" : row[key];
       td.oninput = () => {
@@ -267,9 +276,18 @@ function renderTable() {
 }
 
 function csvEscape(value) {
-  const s = value === null || value === undefined ? "" : String(value);
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  let s = value === null || value === undefined ? "" : String(value);
+  // Guard against CSV/formula injection when this opens in Excel/Sheets -
+  // field values originate from documents read by the model, so treat them
+  // as untrusted input.
+  if (/^[=+\-@\t\r]/.test(s)) {
+    s = "'" + s;
+  }
   if (/[",\n]/.test(s)) {
-    return '"' + s.replace(/"/g, '""') + '"';
+    s = '"' + s.replace(/"/g, '""') + '"';
   }
   return s;
 }

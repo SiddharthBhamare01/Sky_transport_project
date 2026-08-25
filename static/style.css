@@ -105,6 +105,19 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-size: 14px;
 }
 
+.field-row.low-confidence input,
+.field-row.low-confidence select {
+  border-color: var(--warn-border);
+  background: var(--warn-bg);
+}
+.field-row.low-confidence label { color: #92620f; font-weight: 600; }
+
+td.low-confidence {
+  background: var(--warn-bg);
+  outline: 1px solid var(--warn-border);
+  outline-offset: -1px;
+}
+
 .review-flag {
   background: var(--warn-bg);
   border: 1px solid var(--warn-border);
