@@ -183,6 +183,4 @@ per day for a small dispatch team.]
 
 ---
 
-## Availability for a call
 
-[Add your available dates/times here before submitting.]
