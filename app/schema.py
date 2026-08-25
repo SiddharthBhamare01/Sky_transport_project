@@ -23,7 +23,29 @@ BOL_SCHEMA = {
         "review_recommended": {"type": "boolean"},
         "extraction_notes": {"type": ["string", "null"]},
     },
-    "required": ["document_type", "review_recommended"],
+    # OpenAI structured-output "strict" mode requires every property to be
+    # listed as required (the field can still be null - nullability is
+    # expressed via the type union above, not by omitting it here).
+    "required": [
+        "document_type",
+        "shipper_name",
+        "shipper_address",
+        "consignee_name",
+        "consignee_address",
+        "carrier_name",
+        "load_number",
+        "pro_number",
+        "pickup_date",
+        "delivery_date",
+        "weight",
+        "weight_unit",
+        "piece_count",
+        "commodity_description",
+        "freight_charge_terms",
+        "signature_present",
+        "review_recommended",
+        "extraction_notes",
+    ],
     "additionalProperties": False,
 }
 

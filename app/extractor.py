@@ -1,7 +1,8 @@
 import base64
 import json
 
-import anthropic
+import openai
+import pymupdf
 
 from . import config
 from .schema import BOL_SCHEMA
@@ -30,49 +31,63 @@ class ExtractionError(Exception):
         super().__init__(message)
 
 
+def _pdf_first_page_to_png(file_bytes: bytes) -> bytes:
+    doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+    try:
+        page = doc[0]
+        pix = page.get_pixmap(dpi=200)
+        return pix.tobytes("png")
+    finally:
+        doc.close()
+
+
 def extract_from_bytes(file_bytes: bytes, mime_type: str) -> dict:
     if not config.has_api_key():
-        raise ExtractionError("no_api_key", "No ANTHROPIC_API_KEY is configured on the server.")
+        raise ExtractionError("no_api_key", "No OPENAI_API_KEY is configured on the server.")
 
-    block_type = "document" if mime_type == "application/pdf" else "image"
-    b64_data = base64.b64encode(file_bytes).decode("ascii")
+    if mime_type == "application/pdf":
+        image_bytes = _pdf_first_page_to_png(file_bytes)
+        image_mime = "image/png"
+    else:
+        image_bytes = file_bytes
+        image_mime = mime_type
 
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    b64_data = base64.b64encode(image_bytes).decode("ascii")
+    data_url = f"data:{image_mime};base64,{b64_data}"
+
+    client = openai.OpenAI(api_key=config.OPENAI_API_KEY)
 
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=config.EXTRACTION_MODEL,
             max_tokens=1024,
-            system=SYSTEM_PROMPT,
             messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": block_type,
-                            "source": {
-                                "type": "base64",
-                                "media_type": mime_type,
-                                "data": b64_data,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": "Extract the shipment data from this document.",
-                        },
+                        {"type": "text", "text": "Extract the shipment data from this document."},
+                        {"type": "image_url", "image_url": {"url": data_url}},
                     ],
-                }
+                },
             ],
-            output_config={"format": {"type": "json_schema", "schema": BOL_SCHEMA}},
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "bol_extraction",
+                    "schema": BOL_SCHEMA,
+                    "strict": True,
+                },
+            },
         )
-    except anthropic.RateLimitError as e:
+    except openai.RateLimitError as e:
         raise ExtractionError("rate_limited", "The extraction service is rate-limited right now. Please try again shortly.") from e
-    except anthropic.APIConnectionError as e:
+    except openai.APIConnectionError as e:
         raise ExtractionError("connection_error", "Could not reach the extraction service.") from e
-    except anthropic.APIStatusError as e:
+    except openai.APIStatusError as e:
         raise ExtractionError("api_error", f"Extraction service returned an error ({e.status_code}).") from e
 
-    text = "".join(block.text for block in response.content if getattr(block, "type", None) == "text")
+    text = response.choices[0].message.content
     try:
         fields = json.loads(text)
     except json.JSONDecodeError as e:
