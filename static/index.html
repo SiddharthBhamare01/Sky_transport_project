@@ -37,13 +37,15 @@
         <span class="dropzone-hint">PDF, PNG, JPG · up to 10MB</span>
       </label>
       <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" hidden />
-      <div class="upload-actions">
-        <button class="primary" id="uploadBtn">Extract</button>
-        <span class="or-divider">or try a sample</span>
-        <span id="sampleButtons"></span>
-      </div>
+      <button class="primary" id="uploadBtn">Extract</button>
     </div>
     <div id="errorBox" class="error-box hidden"></div>
+
+    <div class="sample-section">
+      <div class="sample-divider"><span>or</span></div>
+      <p class="sample-label">No document handy? Try a sample — same full workflow, no upload needed:</p>
+      <div id="sampleButtons" class="sample-buttons-row"></div>
+    </div>
   </div>
 
   <div class="panel hidden" id="resultPanel">
