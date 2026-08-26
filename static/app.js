@@ -19,7 +19,10 @@ const FORM_FIELDS = [
 
 const TABLE_FIELDS = [...FORM_FIELDS.map((f) => f.key), "review_recommended", "extraction_notes"];
 
-const STORAGE_KEY = "shipment_rows_v1";
+const NUMBER_FIELDS = new Set(["weight"]);
+const INT_FIELDS = new Set(["piece_count"]);
+const BOOL_FIELDS = new Set(["signature_present", "review_recommended"]);
+const NIL_ID = "00000000-0000-0000-0000-000000000000";
 
 let currentFields = null;
 let currentPreviewUrl = null;
@@ -27,25 +30,44 @@ let currentPreviewIsPdf = false;
 
 const $ = (id) => document.getElementById(id);
 
-function loadRows() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  } catch {
+const { createClient } = window.supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Coerces the always-stringy values that come out of form inputs / inline
+// table edits into the types Supabase's columns actually expect, so a
+// cleared numeric/boolean cell doesn't get sent as "" and rejected.
+function toRow(fields) {
+  const out = { ...fields };
+  Object.keys(out).forEach((k) => {
+    const v = out[k];
+    if (NUMBER_FIELDS.has(k)) {
+      out[k] = v === "" || v === null || v === undefined ? null : Number(v);
+    } else if (INT_FIELDS.has(k)) {
+      out[k] = v === "" || v === null || v === undefined ? null : parseInt(v, 10);
+    } else if (BOOL_FIELDS.has(k)) {
+      out[k] = v === "" || v === null || v === undefined ? null : (v === true || v === "true");
+    }
+  });
+  if ("low_confidence_fields" in out) out.low_confidence_fields = out.low_confidence_fields || [];
+  return out;
+}
+
+let rows = [];
+
+async function loadRowsFromSupabase() {
+  const { data, error } = await db.from("shipment_rows").select("*").order("created_at", { ascending: true });
+  if (error) {
+    showError("Could not load saved rows: " + error.message);
     return [];
   }
+  return data;
 }
-
-function saveRows(rows) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
-}
-
-let rows = loadRows();
 
 async function init() {
-  const cfg = await fetch("/api/config").then((r) => r.json());
+  const cfg = await fetch(`${RENDER_ORIGIN}/api/config`).then((r) => r.json());
   if (!cfg.has_api_key) $("sampleBanner").classList.add("visible");
 
-  const samples = await fetch("/api/samples").then((r) => r.json());
+  const samples = await fetch(`${RENDER_ORIGIN}/api/samples`).then((r) => r.json());
   const container = $("sampleButtons");
   samples.forEach((s) => {
     const btn = document.createElement("button");
@@ -58,15 +80,49 @@ async function init() {
   $("uploadBtn").onclick = runUpload;
   $("addRowBtn").onclick = addCurrentToTable;
   $("exportBtn").onclick = exportCsv;
-  $("clearBtn").onclick = () => {
-    if (confirm("Clear all rows?")) {
-      rows = [];
-      saveRows(rows);
-      renderTable();
+  $("clearBtn").onclick = async () => {
+    if (!confirm("Clear all rows for everyone? This deletes the shared queue and cannot be undone.")) return;
+    const { error } = await db.from("shipment_rows").delete().neq("id", NIL_ID);
+    if (error) {
+      showError("Could not clear rows: " + error.message);
+      return;
     }
+    rows = [];
+    renderTable();
   };
 
+  const fileInput = $("fileInput");
+  const dropzone = document.querySelector(".dropzone");
+  fileInput.addEventListener("change", () => updateDropzoneLabel(fileInput.files[0]));
+  if (dropzone) {
+    ["dragenter", "dragover"].forEach((evt) =>
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+      })
+    );
+    ["dragleave", "drop"].forEach((evt) =>
+      dropzone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+      })
+    );
+    dropzone.addEventListener("drop", (e) => {
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      fileInput.files = e.dataTransfer.files;
+      updateDropzoneLabel(file);
+    });
+  }
+
+  rows = await loadRowsFromSupabase();
   renderTable();
+}
+
+function updateDropzoneLabel(file) {
+  const label = document.querySelector(".dropzone-text");
+  if (!label) return;
+  label.textContent = file ? file.name : "Drop a file or browse";
 }
 
 function showError(msg) {
@@ -90,15 +146,19 @@ async function runUpload() {
   showError(null);
   const fd = new FormData();
   fd.append("file", file);
-  await runExtraction(() => fetch("/api/extract", { method: "POST", body: fd }), URL.createObjectURL(file), file.type === "application/pdf");
+  await runExtraction(
+    () => fetch(`${RENDER_ORIGIN}/api/extract`, { method: "POST", body: fd }),
+    URL.createObjectURL(file),
+    file.type === "application/pdf"
+  );
 }
 
 async function runSample(sampleId, filename) {
   showError(null);
   const isPdf = filename.toLowerCase().endsWith(".pdf");
   await runExtraction(
-    () => fetch(`/api/extract?sample_id=${encodeURIComponent(sampleId)}`, { method: "POST" }),
-    `/samples/${filename}`,
+    () => fetch(`${RENDER_ORIGIN}/api/extract?sample_id=${encodeURIComponent(sampleId)}`, { method: "POST" }),
+    `${RENDER_ORIGIN}/samples/${filename}`,
     isPdf
   );
 }
@@ -220,14 +280,22 @@ function readFormIntoFields() {
   return out;
 }
 
-function addCurrentToTable() {
+async function addCurrentToTable() {
   if (!currentFields) return;
   const edited = readFormIntoFields();
   edited.review_recommended = currentFields.review_recommended;
   edited.extraction_notes = currentFields.extraction_notes;
   edited.low_confidence_fields = currentFields.low_confidence_fields || [];
-  rows.push(edited);
-  saveRows(rows);
+
+  const btn = $("addRowBtn");
+  btn.disabled = true;
+  const { data, error } = await db.from("shipment_rows").insert(toRow(edited)).select().single();
+  btn.disabled = false;
+  if (error) {
+    showError("Could not save row: " + error.message);
+    return;
+  }
+  rows.push(data);
   renderTable();
 }
 
@@ -251,20 +319,54 @@ function renderTable() {
     TABLE_FIELDS.forEach((key) => {
       const td = document.createElement("td");
       if (rowLowConfidence.has(key)) td.classList.add("low-confidence");
-      td.contentEditable = "true";
-      td.textContent = row[key] === null || row[key] === undefined ? "" : row[key];
-      td.oninput = () => {
-        rows[idx][key] = td.textContent;
-        saveRows(rows);
-      };
+      if (BOOL_FIELDS.has(key)) {
+        const val = row[key] === true || row[key] === "true" ? "true" : row[key] === false || row[key] === "false" ? "false" : "";
+        const nullable = key !== "review_recommended"; // review_recommended is NOT NULL in Supabase
+        const select = document.createElement("select");
+        select.className = "pill-select pill-" + (val === "true" ? "yes" : val === "false" ? "no" : "unset");
+        (nullable ? [["", "—"], ["true", "Yes"], ["false", "No"]] : [["true", "Yes"], ["false", "No"]]).forEach(([v, label]) => {
+          const opt = document.createElement("option");
+          opt.value = v;
+          opt.textContent = label;
+          if (v === val) opt.selected = true;
+          select.appendChild(opt);
+        });
+        select.onchange = async () => {
+          const newValue = select.value;
+          select.className = "pill-select pill-" + (newValue === "true" ? "yes" : newValue === "false" ? "no" : "unset");
+          rows[idx][key] = newValue;
+          if (!rows[idx].id) return;
+          const { error } = await db.from("shipment_rows").update(toRow({ [key]: newValue })).eq("id", rows[idx].id);
+          if (error) showError("Could not save edit: " + error.message);
+        };
+        td.appendChild(select);
+      } else {
+        td.contentEditable = "true";
+        td.textContent = row[key] === null || row[key] === undefined ? "" : row[key];
+        td.onblur = async () => {
+          const newValue = td.textContent;
+          if (rows[idx][key] === newValue) return;
+          rows[idx][key] = newValue;
+          if (!rows[idx].id) return;
+          const { error } = await db.from("shipment_rows").update(toRow({ [key]: newValue })).eq("id", rows[idx].id);
+          if (error) showError("Could not save edit: " + error.message);
+        };
+      }
       tr.appendChild(td);
     });
     const tdAction = document.createElement("td");
     const delBtn = document.createElement("button");
     delBtn.textContent = "Delete";
-    delBtn.onclick = () => {
+    delBtn.onclick = async () => {
+      const row = rows[idx];
+      if (row.id) {
+        const { error } = await db.from("shipment_rows").delete().eq("id", row.id);
+        if (error) {
+          showError("Could not delete row: " + error.message);
+          return;
+        }
+      }
       rows.splice(idx, 1);
-      saveRows(rows);
       renderTable();
     };
     tdAction.appendChild(delBtn);

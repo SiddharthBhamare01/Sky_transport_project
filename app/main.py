@@ -2,6 +2,7 @@ import mimetypes
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -17,10 +18,14 @@ ALLOWED_MIME_TYPES = {"application/pdf", "image/png", "image/jpeg", "image/jpg"}
 
 app = FastAPI(title="Shipment Document Data Extractor")
 
-
-@app.get("/")
-def index():
-    return FileResponse(STATIC_DIR / "index.html")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https://sky-transport-project.*\.vercel\.app",
+    allow_origins=["http://localhost:8811", "http://127.0.0.1:8811"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+    allow_credentials=False,
+)
 
 
 @app.get("/api/config")
@@ -74,4 +79,4 @@ async def extract(file: UploadFile | None = File(None), sample_id: str | None = 
     return {"fields": fields, "source": "live"}
 
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
