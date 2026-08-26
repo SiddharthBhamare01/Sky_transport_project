@@ -30,9 +30,6 @@ let currentPreviewIsPdf = false;
 
 const $ = (id) => document.getElementById(id);
 
-const { createClient } = window.supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
-
 // Coerces the always-stringy values that come out of form inputs / inline
 // table edits into the types Supabase's columns actually expect, so a
 // cleared numeric/boolean cell doesn't get sent as "" and rejected.
@@ -64,6 +61,17 @@ async function loadRowsFromSupabase() {
 }
 
 async function init() {
+  const { data: sessionData } = await db.auth.getSession();
+  if (!sessionData.session) {
+    location.href = "./login.html";
+    return;
+  }
+  $("userEmail").textContent = sessionData.session.user.email;
+  $("logoutBtn").onclick = async () => {
+    await signOut();
+    location.href = "./login.html";
+  };
+
   const cfg = await fetch(`${RENDER_ORIGIN}/api/config`).then((r) => r.json());
   if (!cfg.has_api_key) $("sampleBanner").classList.add("visible");
 
@@ -297,6 +305,15 @@ async function addCurrentToTable() {
   }
   rows.push(data);
   renderTable();
+  notifyBackend("/api/notify/row-added", {
+    load_number: data.load_number,
+    shipper_name: data.shipper_name,
+    consignee_name: data.consignee_name,
+    carrier_name: data.carrier_name,
+    weight: data.weight,
+    weight_unit: data.weight_unit,
+    piece_count: data.piece_count,
+  });
 }
 
 function renderTable() {

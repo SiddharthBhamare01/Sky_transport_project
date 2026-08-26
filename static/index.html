@@ -18,6 +18,10 @@
         <p class="subtitle">Upload a Bill of Lading or Proof of Delivery — extract the fields, review, and export to CSV.</p>
       </div>
     </div>
+    <div class="account-bar">
+      <span id="userEmail" class="account-email"></span>
+      <button id="logoutBtn">Log out</button>
+    </div>
   </header>
 
   <div id="sampleBanner" class="banner">
@@ -75,6 +79,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js"></script>
+  <script src="./auth.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

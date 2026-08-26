@@ -1,14 +1,18 @@
+import logging
 import mimetypes
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
-from . import config
+from . import config, notify
 from .extractor import ExtractionError, extract_from_bytes
 from .sample_mode import SAMPLES
+
+logger = logging.getLogger("sky_transport.notify")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
@@ -77,6 +81,68 @@ async def extract(file: UploadFile | None = File(None), sample_id: str | None = 
         return JSONResponse({"error": e.kind, "message": e.message}, status_code=200)
 
     return {"fields": fields, "source": "live"}
+
+
+class RowAddedPayload(BaseModel):
+    load_number: str | None = None
+    shipper_name: str | None = None
+    consignee_name: str | None = None
+    carrier_name: str | None = None
+    weight: float | None = None
+    weight_unit: str | None = None
+    piece_count: int | None = None
+
+
+@app.post("/api/notify/welcome")
+def notify_welcome(authorization: str | None = Header(default=None)):
+    user = notify.verify_token(authorization)
+    try:
+        notify.send_email(
+            user["email"],
+            "Welcome to Sky Transport",
+            "Your account is ready. You can now sign in and start extracting shipment documents.",
+        )
+    except notify.NotifyError as e:
+        logger.warning("welcome email failed: %s", e)
+        raise HTTPException(status_code=502, detail="Could not send welcome email")
+    return {"sent": True}
+
+
+@app.post("/api/notify/password-changed")
+def notify_password_changed(authorization: str | None = Header(default=None)):
+    user = notify.verify_token(authorization)
+    try:
+        notify.send_email(
+            user["email"],
+            "Your Sky Transport password was changed",
+            "This is a confirmation that your account password was just changed. "
+            "If you didn't do this, reset your password again immediately.",
+        )
+    except notify.NotifyError as e:
+        logger.warning("password-changed email failed: %s", e)
+        raise HTTPException(status_code=502, detail="Could not send confirmation email")
+    return {"sent": True}
+
+
+@app.post("/api/notify/row-added")
+def notify_row_added(payload: RowAddedPayload, authorization: str | None = Header(default=None)):
+    user = notify.verify_token(authorization)
+    weight = f"{payload.weight} {payload.weight_unit}" if payload.weight is not None else "—"
+    body = (
+        f"Your shipment was added to the queue:\n\n"
+        f"Load #: {payload.load_number or '—'}\n"
+        f"Shipper: {payload.shipper_name or '—'}\n"
+        f"Consignee: {payload.consignee_name or '—'}\n"
+        f"Carrier: {payload.carrier_name or '—'}\n"
+        f"Weight: {weight}\n"
+        f"Pieces: {payload.piece_count if payload.piece_count is not None else '—'}\n"
+    )
+    try:
+        notify.send_email(user["email"], "Shipment added", body)
+    except notify.NotifyError as e:
+        logger.warning("row-added email failed: %s", e)
+        raise HTTPException(status_code=502, detail="Could not send notification email")
+    return {"sent": True}
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

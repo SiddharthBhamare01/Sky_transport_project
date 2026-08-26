@@ -30,8 +30,17 @@ body {
 
 h1, h3 { font-family: "Space Grotesk", "Inter", sans-serif; }
 
-.page-header { margin-bottom: 24px; }
+.page-header {
+  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
 .brand { display: flex; align-items: center; gap: 16px; }
+.account-bar { display: flex; align-items: center; gap: 10px; }
+.account-email { font-size: 13px; color: var(--text-dim); }
 .brand-mark {
   flex: none;
   width: 48px;
@@ -261,3 +270,46 @@ td[contenteditable="true"] { min-width: 90px; font-variant-numeric: tabular-nums
 }
 
 .hidden { display: none; }
+
+.auth-body {
+  max-width: none;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.auth-card { width: 100%; max-width: 380px; }
+.auth-brand { justify-content: center; margin-bottom: 20px; }
+.auth-brand h1 { font-size: 19px; margin: 0; }
+.auth-field { grid-template-columns: 1fr; gap: 4px; margin-bottom: 14px; }
+.auth-field input { padding: 9px 10px; font-size: 14px; }
+.auth-submit { width: 100%; margin-top: 4px; }
+
+.google-btn {
+  width: 100%;
+  margin-top: 10px;
+  background: white;
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+.google-btn:hover { background: var(--bg); }
+
+.status-box {
+  background: #e3f8ec;
+  border: 1px solid #a9e3c3;
+  color: #1a7f4b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+}
+
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  font-size: 13px;
+}
+.auth-links a { color: var(--accent); text-decoration: none; }
+.auth-links a:hover { text-decoration: underline; }
