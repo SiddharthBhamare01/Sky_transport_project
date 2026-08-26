@@ -125,7 +125,16 @@ async function init() {
   }
 
   const cameraInput = $("cameraInput");
-  if (cameraInput) {
+  const captureRow = document.querySelector(".capture-row");
+  const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(navigator.userAgent);
+  if (captureRow && !isMobileDevice) {
+    // capture="environment" is a no-op on desktop browsers - there's no
+    // camera to launch, so it just falls back to the same file picker as
+    // "browse". Showing it there would look like a distinct, broken feature
+    // rather than a no-op, so it's only shown on mobile where it does
+    // something the regular file picker doesn't.
+    captureRow.classList.add("hidden");
+  } else if (cameraInput) {
     cameraInput.addEventListener("change", () => {
       const file = cameraInput.files[0];
       if (!file) return;
