@@ -123,6 +123,18 @@ async function init() {
     });
   }
 
+  const cameraInput = $("cameraInput");
+  if (cameraInput) {
+    cameraInput.addEventListener("change", () => {
+      const file = cameraInput.files[0];
+      if (!file) return;
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      updateDropzoneLabel(file);
+    });
+  }
+
   rows = await loadRowsFromSupabase();
   renderTable();
 }

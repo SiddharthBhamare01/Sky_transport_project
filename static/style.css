@@ -111,6 +111,30 @@ p.subtitle { color: var(--text-dim); margin: 0; font-size: 14.5px; }
 
 #uploadBtn { align-self: flex-start; }
 
+.capture-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.capture-divider { color: var(--text-dim); font-size: 12.5px; }
+.camera-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.camera-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.camera-icon { font-size: 16px; }
+.capture-hint { font-size: 12.5px; color: var(--text-dim); }
+
 .sample-section { margin-top: 18px; }
 
 .sample-divider {
