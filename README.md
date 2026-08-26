@@ -2,21 +2,52 @@
 
 # ✈ Sky Transport — Shipment Document Data Extractor
 
-Upload a Bill of Lading or Proof of Delivery — get structured shipment data back in seconds, no manual retyping.
+**Upload a Bill of Lading or Proof of Delivery — get structured shipment data back in seconds, no manual retyping.**
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-sky--transport--project.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://sky-transport-project.vercel.app)
 
 [![CI](https://github.com/SiddharthBhamare01/Sky_transport_project/actions/workflows/ci.yml/badge.svg)](https://github.com/SiddharthBhamare01/Sky_transport_project/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](requirements.txt)
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?logo=fastapi)](app/main.py)
+[![Supabase](https://img.shields.io/badge/Supabase-Auth%20%2B%20Postgres-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-Vision%20API-412991?logo=openai&logoColor=white)](app/extractor.py)
+[![Deployed on Render](https://img.shields.io/badge/API-Render-46E3B7?logo=render&logoColor=white)](https://sky-transport-project.onrender.com)
 
-**[Live app](https://sky-transport-project.vercel.app)** · **[API (Render)](https://sky-transport-project.onrender.com)** · Built for the Sky Transport Solutions technical assessment, **AUTOMATE** track
+**[🚀 Live app](https://sky-transport-project.vercel.app)** · **[⚙ API (Render)](https://sky-transport-project.onrender.com)** · Built for the Sky Transport Solutions technical assessment, **AUTOMATE** track
 
 </div>
 
-![App screenshot](docs/screenshot.png)
-
 > The API is hosted on Render's free tier, which spins down after inactivity — the **first** request after a period of idle time can take up to ~50 seconds to wake back up. The app tells you this is happening ("Waking up server…") rather than looking frozen.
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%">
+
+**Sign in** — email/password or Google, via Supabase Auth
+
+![Login screen](docs/screenshot-login.png)
+
+</td>
+<td width="50%">
+
+**Mobile** — camera capture, HEIC support, ~44px touch targets
+
+![Mobile view](docs/screenshot-mobile.png)
+
+</td>
+</tr>
+</table>
+
+**Extraction results** — per-field low-confidence flagging in action: `delivery_date` and `signature_present` are highlighted because the source document doesn't clearly show them, with a plain-language explanation banner. The shared queue below shows the same flag carried through to a saved row.
+
+![Extraction results with low-confidence flags and the shared queue table](docs/screenshot-extraction.png)
 
 ## Table of contents
 
+- [Screenshots](#screenshots)
 - [What it does](#what-it-does)
 - [Features](#features)
 - [Tech stack](#tech-stack)
