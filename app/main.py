@@ -18,7 +18,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 SAMPLES_DIR = BASE_DIR / "samples"
 
-ALLOWED_MIME_TYPES = {"application/pdf", "image/png", "image/jpeg", "image/jpg"}
+# Some OS mimetypes databases don't know these extensions, so file.content_type's
+# mimetypes.guess_type fallback (below) needs them registered explicitly - HEIC is
+# the default photo format on iPhones since iOS 11.
+mimetypes.add_type("image/heic", ".heic")
+mimetypes.add_type("image/heif", ".heif")
+
+ALLOWED_MIME_TYPES = {
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/heic",
+    "image/heif",
+}
 
 app = FastAPI(title="Shipment Document Data Extractor")
 

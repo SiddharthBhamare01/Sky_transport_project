@@ -100,6 +100,7 @@ p.subtitle { color: var(--text-dim); margin: 0; font-size: 14.5px; }
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .dropzone:hover,
+.dropzone:active,
 .dropzone.dragover {
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -126,12 +127,14 @@ p.subtitle { color: var(--text-dim); margin: 0; font-size: 14.5px; }
   background: white;
   border-radius: 8px;
   padding: 9px 16px;
+  min-height: 44px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
-.camera-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.camera-btn:hover,
+.camera-btn:active { border-color: var(--accent); background: var(--accent-soft); }
 .camera-icon { font-size: 16px; }
 .capture-hint { font-size: 12.5px; color: var(--text-dim); }
 
@@ -173,6 +176,7 @@ button, input[type="file"]::file-selector-button {
   color: var(--ink);
   border-radius: 8px;
   padding: 9px 16px;
+  min-height: 44px; /* iOS/Material minimum tap target - matters on a phone in the field */
   font-size: 14px;
   font-family: inherit;
   cursor: pointer;
@@ -293,8 +297,9 @@ td[contenteditable="true"] { min-width: 90px; font-variant-numeric: tabular-nums
 .pill-select {
   border: none;
   border-radius: 999px;
-  padding: 3px 10px 3px 8px;
-  font-size: 12px;
+  padding: 6px 14px 6px 10px;
+  min-height: 32px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }

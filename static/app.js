@@ -23,6 +23,7 @@ const NUMBER_FIELDS = new Set(["weight"]);
 const INT_FIELDS = new Set(["piece_count"]);
 const BOOL_FIELDS = new Set(["signature_present", "review_recommended"]);
 const NIL_ID = "00000000-0000-0000-0000-000000000000";
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // must match app/config.py's MAX_UPLOAD_BYTES
 
 let currentFields = null;
 let currentPreviewUrl = null;
@@ -163,6 +164,10 @@ async function runUpload() {
     return;
   }
   const file = input.files[0];
+  if (file.size > MAX_UPLOAD_BYTES) {
+    showError("That file is too large (10MB limit) — try retaking the photo at a lower resolution.");
+    return;
+  }
   showError(null);
   const fd = new FormData();
   fd.append("file", file);
@@ -184,7 +189,15 @@ async function runSample(sampleId, filename) {
 }
 
 async function runExtraction(doFetch, previewUrl, isPdf) {
-  $("uploadBtn").disabled = true;
+  const btn = $("uploadBtn");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Extracting…";
+  // Render's free tier cold-starts after inactivity (~50s) - without this,
+  // that wait looks identical to a hung/broken app.
+  const wakingUpTimer = setTimeout(() => {
+    btn.textContent = "Waking up server… this can take up to a minute";
+  }, 4000);
   try {
     const resp = await doFetch();
     let data = null;
@@ -204,9 +217,17 @@ async function runExtraction(doFetch, previewUrl, isPdf) {
     renderForm();
     $("resultPanel").classList.remove("hidden");
   } catch (e) {
-    showError("Request failed: " + e);
+    if (!navigator.onLine) {
+      showError("You appear to be offline. Check your connection and try again.");
+    } else if (e instanceof TypeError) {
+      showError("Could not reach the server. Check your connection and try again.");
+    } else {
+      showError("Request failed: " + e);
+    }
   } finally {
-    $("uploadBtn").disabled = false;
+    clearTimeout(wakingUpTimer);
+    btn.disabled = false;
+    btn.textContent = originalLabel;
   }
 }
 

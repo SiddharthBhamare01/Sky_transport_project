@@ -1,11 +1,18 @@
 import base64
+import io
 import json
 
 import openai
 import pymupdf
+from PIL import Image
+from pillow_heif import register_heif_opener
 
 from . import config
 from .schema import BOL_SCHEMA
+
+register_heif_opener()
+
+HEIC_MIME_TYPES = {"image/heic", "image/heif"}
 
 SYSTEM_PROMPT = """You are extracting shipment data from a US trucking Bill of \
 Lading (BOL) or Proof of Delivery (POD) document for a dispatch team, so the data \
@@ -47,6 +54,13 @@ def _pdf_first_page_to_png(file_bytes: bytes) -> bytes:
         doc.close()
 
 
+def _heic_to_png(file_bytes: bytes) -> bytes:
+    with Image.open(io.BytesIO(file_bytes)) as img:
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, format="PNG")
+        return buf.getvalue()
+
+
 def extract_from_bytes(file_bytes: bytes, mime_type: str) -> dict:
     if not config.has_api_key():
         raise ExtractionError("no_api_key", "No OPENAI_API_KEY is configured on the server.")
@@ -56,6 +70,14 @@ def extract_from_bytes(file_bytes: bytes, mime_type: str) -> dict:
             image_bytes = _pdf_first_page_to_png(file_bytes)
         except Exception as e:
             raise ExtractionError("invalid_pdf", "Could not read the uploaded PDF (it may be corrupt or empty).") from e
+        image_mime = "image/png"
+    elif mime_type in HEIC_MIME_TYPES:
+        # OpenAI's vision API doesn't accept HEIC/HEIF directly (only
+        # PNG/JPEG/WEBP/GIF) - this is the default photo format on iPhones.
+        try:
+            image_bytes = _heic_to_png(file_bytes)
+        except Exception as e:
+            raise ExtractionError("invalid_image", "Could not read the uploaded photo (it may be corrupt).") from e
         image_mime = "image/png"
     else:
         image_bytes = file_bytes
