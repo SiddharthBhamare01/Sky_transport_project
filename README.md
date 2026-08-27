@@ -2,7 +2,7 @@
 
 # ✈ Sky Transport — Shipment Document Data Extractor
 
-**Upload a Bill of Lading or Proof of Delivery — get structured shipment data back in seconds, no manual retyping.**
+**Upload a Bill of Lading (BOL) or Proof of Delivery (POD) — get structured shipment data back in seconds, no manual retyping.**
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-sky--transport--project.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://sky-transport-project.vercel.app)
 

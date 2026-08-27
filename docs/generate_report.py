@@ -121,8 +121,9 @@ def cover_page(story):
     story.append(Paragraph("Shipment Document Data Extractor", ParagraphStyle(
         "T2", parent=title_style, fontSize=17, textColor=ACCENT_DARK, spaceBefore=0, spaceAfter=18)))
     story.append(Paragraph(
-        "A web application that reads a Bill of Lading or Proof of Delivery — a PDF or a phone "
-        "photo — and extracts the shipment fields a dispatcher would otherwise retype by hand.",
+        "A web application that reads a Bill of Lading (BOL) or Proof of Delivery (POD) — a PDF "
+        "or a phone photo — and extracts the shipment fields a dispatcher would otherwise retype "
+        "by hand.",
         subtitle_style,
     ))
     story.append(Spacer(1, 26))
